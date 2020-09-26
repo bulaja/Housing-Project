@@ -1,9 +1,3 @@
-getwd()
-setwd("C:/Users/dejan.bulaja/Desktop/R Programming/Housing project/")
-getwd()
-
-
-library(DataExplorer)
 library(tidyverse)
 library(scales)
 library(corrplot)
@@ -21,7 +15,7 @@ source('01_functions/load_data.R')
 plot_price_fullsq <- df %>%
   ggplot(aes(x=full_sq, y=price_eur)) + geom_point(col="black") +
   geom_smooth(se=F) +
-  scale_y_continuous(labels = dollar_format( suffix="\u20ac", prefix ="", big.mark = ",")) +
+  scale_y_continuous(labels = dollar_format(suffix="\u20ac", prefix ="", big.mark = ",")) +
   labs(title= "Full Sq./ Price",
        x= "Full Sq.",
        y= "Price") + theme_tq()
