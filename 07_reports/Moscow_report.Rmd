@@ -1,0 +1,144 @@
+---
+title: "Moscow Report"
+output: flexdashboard::flex_dashboard
+---
+
+```{r setup, include=FALSE}
+
+library(tidyverse)
+library(highcharter)
+library(plotly)
+library(ggplot2)
+library(scales)
+library(tidyquant)
+load("../03_env/eda_data.RData")
+```
+
+Column 
+-------------------------------------
+    
+### Interactive Map
+```{r}
+plot_moscow_map
+```
+
+Column {.tabset}
+-------------------------------------
+### Average Price / Neighborhood
+``` {r}
+plot_avgprice_neighborhood
+```
+
+### Average Price per m2 / Neighborhood
+
+``` {r}
+plot_avgeursqm_neighborhood
+```
+
+### Average price/m2 / prod type
+
+```{r}
+plot_avgeursqm_prodtype
+```
+
+
+### Room count distribution
+
+```{r}
+plot_roomcount
+```
+
+### Average Size in m2 / Neighborhood
+
+```{r}
+plot_avgfullsq_neighborhood
+```
+
+
+### Number of Rooms / Price
+
+```{r, echo=FALSE, out.width = '120%'}
+plot_roomcount_price
+```
+
+### Full Sq. / Price
+```{r}
+plot_price_fullsq
+```
+
+### Corellation Matrix
+```{r}
+plot_top10_correlations
+```
+
+### Model Ranking
+```{r}
+h2o <- read.csv("../h2o results with macro.csv") %>% select(model_id,mae)
+lgbm <- read.csv("../lgbm_fractions_with_macro.csv") %>% select(model_id,mae)
+
+table <- rbind(h2o,lgbm) %>% 
+  arrange(mae) %>% 
+  head(20) %>% 
+  mutate(Percent =round(mae/mean(df$eur_sqm),2)*100)
+
+knitr::kable(table)
+```
+
+### Variable Importance
+
+```{r}
+
+varimp <- read.csv("../lgbm_varimp.csv")
+
+varimp %>%
+  top_n(20) %>% 
+  hchart('bar', hcaes(x = Feature, y = Scaled_importance)) %>%  
+    hc_xAxis(title = list(text = ""))%>% 
+  hc_yAxis(title = list(text = "Scaled Importance"), max=1) %>% 
+  hc_title(text = "Variable Importance") %>%
+  hc_add_theme(hc_theme_elementary())
+
+```
+
+
+### Plot Predictions
+
+```{r pressure, echo=FALSE, out.width = '100%'}
+true_values <- read.csv("../true_values.csv")
+ggplotly(
+true_values %>%
+  ggplot(aes(eur_sqm,Predicted)) +
+  geom_point() +
+  labs(title = "Actual values vs Predictions",
+       x = "Actual") +
+  theme_tq() +
+geom_abline(slope=1, size=1, color="blue") +
+scale_y_continuous(labels = dollar_format(suffix="\u20ac", prefix ="", big.mark = ","), 
+                   breaks = seq(1000, 8000, 1000),
+                   limits = c(0,8000)) +
+scale_x_continuous(labels = dollar_format(suffix="\u20ac", prefix ="", big.mark = ","),
+                   breaks = seq(1000, 8000, 1000),
+                   limits = c(0,8000))
+)
+  
+  
+```
+
+
+### Predictions vs Actual
+```{r}
+all_values <- read.csv("../all_values.csv")
+
+ggplotly(all_values %>%
+  filter(as.numeric(observation) < 41) %>%
+  mutate(key = fct_rev(key)) %>% 
+  # Visualize
+  ggplot(aes(x = observation, y = value, color = key)) +
+  geom_point(size = 3) +
+  theme_tq() +
+  scale_color_tq() +
+  coord_flip() +
+  scale_x_continuous(breaks = seq(1,40)) +
+  scale_y_continuous(labels = dollar_format(suffix="\u20ac", prefix ="", big.mark = ",")) +
+  labs(title = "Prediction vs Actual"))
+```

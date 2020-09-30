@@ -2,8 +2,10 @@ library(janitor)
 library(tidyverse)
 library(lubridate)
 library(rsample)
+library(sf)
+library(here)
 
-data <- read.csv('00_data/Sberbank Dataset.csv') %>%
+  data <- read.csv('00_data/Sberbank Dataset.csv') %>%
   clean_names()
 
 macro <- read.csv('00_data/Macro.csv') %>%
@@ -30,16 +32,19 @@ features <- c("timestamp","price_doc","full_sq", "floor", # "max_floor",
               "stadium_km", "university_km")
 
 
-df <- as_tibble(data %>% select(features))
-
-
-df <- df %>% 
+df <- as_tibble(data %>% select(features)) %>% 
   filter(full_sq>20 & full_sq < 200) %>%
+  filter(num_room<6 & num_room > 0) %>%
   mutate(timestamp = as_date(as.POSIXct(timestamp,format="%m/%d/%Y"),tz=NULL)) %>%
   left_join(macro %>% select(timestamp, eurrub)) %>% 
-  mutate(price_eur = price_doc / eurrub) %>% 
-  mutate(eur_sqm = round(price_eur / full_sq ))
-  
+  mutate(price_doc = round(price_doc)) %>%
+  mutate(price_eur = round(price_doc / eurrub)) %>% 
+  mutate(eur_sqm = round(price_eur / full_sq )) %>%
+  filter(price_eur < 1700000) %>% 
+  left_join(macro %>% select(timestamp,c("usdrub", "brent", "oil_urals", "rts", "micex_rgbi_tr",
+                                        "deposits_rate", "deposits_value", "fixed_basket", "cpi"))) 
+
+
 #collapse sub_area
 Zelenogradsky <-c("Krjukovo","Matushkino","Savelki","Silino","Staroe Krjukovo")
 Novomoskovsky <-c("Poselenie Desjonovskoe","Poselenie Filimonkovskoe","Poselenie Kokoshkino","Poselenie Marushkinskoe","Poselenie Moskovskij","Poselenie Mosrentgen","Poselenie Rjazanovskoe","Poselenie Shherbinka","Poselenie Sosenskoe","Poselenie Vnukovskoe","Poselenie Voskresenskoe")
@@ -67,10 +72,43 @@ df$neighborhood[df$sub_area %in% Western] <- "Western"
 df$neighborhood[df$sub_area %in% Northwest] <- "Northwest"
 df$neighborhood[df$sub_area %in% Southeast] <- "Southeast"
 
+
 # Train/Test split ----
-df_ml <- df %>% select(-price_doc, -price_eur, -eurrub, -timestamp)
+df_ml <- df %>% select(-price_doc, -price_eur)
 set.seed(11)
 split <- initial_split(df_ml, prop = 0.8, strata = eur_sqm)
 train_data <- split %>% training()
 test_data <- split %>% testing()
+
+
+# With Coordinates for plotting
+coordinates <- df
+shp <- st_read("00_data/moscow_adm.shp")
+
+randomXPointInPoly <- function(data, polygon) {
+  bounds <- data[data$RAION== polygon,"geometry"] %>% st_bbox()
+  x_min <- bounds[1]
+  x_max <- bounds[3]
+  x_diff <- x_max - x_min
+  long <- round(runif(1, min=x_min + x_diff * 0.2, max=x_max - x_diff * 0.2),4)
+  return (long)
+  
+}
+
+randomYPointInPoly <- function(data, polygon) {
+  bounds <- data[data$RAION== polygon,"geometry"] %>% st_bbox()
+  y_min <- bounds[2]
+  y_max <- bounds[4]
+  y_diff <- y_max - y_min
+  lat <- round(runif(1, min=y_min + y_diff * 0.2, max=y_max - y_diff * 0.2),4)
+  return (lat)
+  
+}
+
+
+
+for (n in c(1:nrow(coordinates))) {
+  coordinates$X[n] <- randomXPointInPoly(shp, coordinates$sub_area[n])
+  coordinates$Y[n] <- randomYPointInPoly(shp, coordinates$sub_area[n])
+}
 

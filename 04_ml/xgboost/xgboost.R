@@ -1,7 +1,6 @@
 library(janitor)
 library(tidymodels)
 library(tidyverse)
-library(DMwR)
 library(treesnip)
 library(doParallel)
 library(tictoc)
@@ -20,11 +19,11 @@ registerDoParallel(cores = all_cores)
 
 # Data prep ----
 
-rec <- recipe(eur_sqm ~ ., df) %>% 
+rec <- recipe(eur_sqm ~ ., df_ml_clean) %>% 
   prep()
 
-train_featured_baked <- bake(rec, df)
-test_featured_baked <- bake(rec, df)
+train_featured_baked <- bake(rec, df_ml_clean)
+test_featured_baked <- bake(rec, df_ml_clean)
 
 set.seed(11)
 val_split <- initial_split(train_featured_baked, prop = 0.8, strata = eur_sqm)
@@ -46,9 +45,9 @@ set.seed(11)
 watchlist <- list(train = dtrain, test = dtest)
 
 params <- list(objective = 'reg:squarederror',
-               eta = c(0.001, 0.003 0.01),
-               max_depth = c(5,9))
-xgb_cv$params
+               eta = c(0.001, 0.003, 0.01),
+               max_depth = c(5,7,9))
+params
 
 xgb_cv <- xgb.cv(params = params,
        data = dtrain,
@@ -57,10 +56,9 @@ xgb_cv <- xgb.cv(params = params,
        nfold = 5,
        prediction = T,
        metrics = list('mae', 'rmse'),
-       early_stopping_rounds = 5)
+       early_stopping_rounds = 5,
+       verbose = 1)
 
-install.packages("jsonlite")
-devtools::install_url('https://github.com/microsoft/LightGBM/releases/download/v3.0.0/lightgbm-3.0.0-r-cran.tar.gz')
 
 xgb_cv
   
